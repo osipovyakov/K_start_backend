@@ -8,10 +8,9 @@ git clone https://github.com/osipovyakov/K_start_backend.git
 ```
 
 ### 2. Установка зависимостей
-Создайте виртуальное окружение и активируйте его:
+Активируйте виртуальное окружение:
 
 ```bash
-py -3.9 -m venv venv
 source venv/Scripts/activate
 ```
 
