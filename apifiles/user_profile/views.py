@@ -1,4 +1,5 @@
 import base64
+import magic
 from io import BytesIO
 from PIL import Image
 from django.core.files.base import ContentFile
@@ -6,46 +7,75 @@ from django.core.files.storage import default_storage
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
-from .models import UserProfile
-from .serializers import UserProfileSerializer, UserPhoto
+from .models import UserProfile, File, CustomStorage
+from .serializers import UserProfileSerializer, FileSerializer
 from rest_framework import viewsets
 from django.conf import settings
 import os
+from rest_framework.permissions import IsAuthenticated
 
 class UserProfileViewSet(viewsets.ModelViewSet):
     queryset = UserProfile.objects.all()
     serializer_class = UserProfileSerializer
+    http_method_names = ['get', 'post']
 
-    @action(detail=True, methods=['post'])
-    def upload_photo(self, request, pk=None):
-        user_profile = self.get_object()
-        file_data = request.data.get('file')
 
-        if file_data:
-            try:
-                # Декодируем base64
-                file_name = request.data.get('file_name', 'photo.png')
-                file_mime = request.data.get('file_mime', 'image/png')
+class FileUploadViewSet(viewsets.ModelViewSet):
+    #permission_classes = [IsAuthenticated]
+    queryset = File.objects.all()
+    serializer_class = FileSerializer
 
-                # Преобразуем base64 в изображение
-                img_data = base64.b64decode(file_data)
-                image = Image.open(BytesIO(img_data))
+    def create(self, request, *args, **kwargs):
+        profile_id = request.data.get('profile_id')
+        file_name = request.data.get('file_name', 'uploaded_file')
+        file_base64 = request.data.get('file_base64')
+        file_type = request.data.get('file_type', 'document')
+        project_id = request.data.get('project_id')
 
-                # Формируем имя изображения
-                image_name = f'{user_profile.profile_id}_{file_name}'
+        # Проверка обязательных параметров
+        if not profile_id or not file_base64:
+            return Response(
+                {"error": "Параметры profile_id и file_base64 обязательны"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
 
-                # Сохраняем изображение в файловое хранилище
-                # Создаем объект ContentFile для сохранения файла
-                image_file = ContentFile(img_data, name=image_name)
-                image_path = default_storage.save(f'user_photos/{image_name}', image_file)
+        try:
+            # Получаем объект пользователя
+            user_profile = UserProfile.objects.get(profile_id=profile_id)
 
-                # Сохраняем путь к изображению в модели
-                user_profile.photo_main = image_path
-                user_profile.save()
+            # Декодируем Base64
+            file_data_decoded = base64.b64decode(file_base64)
+            file_mime = magic.from_buffer(file_data_decoded, mime=True).split('/')[-1]
 
-                # Возвращаем успешный ответ
-                return Response({'status': 'photo uploaded'}, status=status.HTTP_200_OK)
-            except Exception as e:
-                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            # Генерируем имя файла с расширением
+            file_name_with_extension = f"{file_name}.{file_mime}"
+            file_relative_path = os.path.join(f"files/{profile_id}", file_name_with_extension)
 
-        return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+            file_content = ContentFile(file_data_decoded, name=file_name_with_extension)
+
+            # Используем файловое хранилище для сохранения файла
+            custom_storage = CustomStorage()
+            saved_file_path = custom_storage.save(file_relative_path, file_content)
+
+            # Создаем объект ContentFile для хранения файла
+            file_instance = File.objects.create(
+                file_name=file_name,
+                file_type=file_type,
+                file_mime=file_mime,
+                file_base64=file_base64,
+                profile_id=profile_id,
+                project_id=project_id,
+            )
+
+            # Сохраняем файл и путь к нему в модели
+            user_profile.file_field = f"files/{file_instance.file_id}/{file_name_with_extension}"
+            user_profile.save()
+
+            return Response({'status': 'File uploaded successfully'}, status=status.HTTP_200_OK)
+
+        except UserProfile.DoesNotExist:
+            return Response({'error': 'UserProfile not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

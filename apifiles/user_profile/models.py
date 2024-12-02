@@ -14,6 +14,7 @@ class CustomStorage(FileSystemStorage):
 
 class UserProfile(models.Model):
     profile_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, primary_key=True)
+    project_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     profile_type = models.CharField(max_length=20, choices=[('anonymous', 'Anonymous'), ('person', 'Person')])
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
@@ -22,7 +23,20 @@ class UserProfile(models.Model):
     sex = models.CharField(max_length=6, choices=[('male', 'Male'), ('female', 'Female')])
     contact_phone = models.JSONField()
     contact_email = models.JSONField()
-    photo_main = models.CharField(max_length=255, null=True, blank=True)
+    file_field = models.CharField(max_length=255, null=True, blank=True)
 
     def __str__(self):
         return f'{self.first_name} {self.last_name}'
+
+
+class File(models.Model):
+    file_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, primary_key=True)
+    file_name = models.CharField(max_length=30)
+    file_type = models.CharField(max_length=20, choices=[('document', 'Document'), ('avatar', 'Avatar')])
+    file_mime = models.CharField(max_length=10)
+    file_base64 = models.TextField(null=False, blank=False)
+    profile_id = models.UUIDField(null=False, blank=False)
+    project_id = models.UUIDField(null=False, blank=False)
+
+    def __str__(self):
+        return f'{self.file_name} {self.file_type}'

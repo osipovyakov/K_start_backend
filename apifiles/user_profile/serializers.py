@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import UserProfile
+from .models import UserProfile, File
 
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -7,7 +7,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class UserPhoto (serializers.ModelSerializer):
+class FileSerializer(serializers.ModelSerializer):
     class Meta:
-        model = UserProfile
-        fields = ['profile_id', 'photo_main']
+        model = File
+        fields = ['file_id', 'file_name', 'file_type', 'file_base64', 'profile_id', 'project_id']
