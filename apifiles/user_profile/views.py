@@ -1,4 +1,5 @@
 import base64
+import filetype
 import magic
 from io import BytesIO
 from PIL import Image
@@ -46,10 +47,21 @@ class FileUploadViewSet(viewsets.ModelViewSet):
 
             # Декодируем Base64
             file_data_decoded = base64.b64decode(file_base64)
-            file_mime = magic.from_buffer(file_data_decoded, mime=True).split('/')[-1]
+            
+
+            # Определяем MIME-тип и расширение с помощью filetype
+            kind = filetype.guess(file_data_decoded)
+            if not kind:
+                return Response(
+                    {"error": "Не удалось определить тип файла"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            file_mime = kind.mime
+            file_extension = kind.extension
 
             # Генерируем имя файла с расширением
-            file_name_with_extension = f"{file_name}.{file_mime}"
+            file_name_with_extension = f"{file_name}.{file_extension}"
             file_relative_path = os.path.join(f"files/{profile_id}", file_name_with_extension)
 
 
