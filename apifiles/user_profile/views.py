@@ -36,7 +36,7 @@ class FileUploadViewSet(viewsets.ModelViewSet):
         # Проверка обязательных параметров
         if not profile_id or not file_base64:
             return Response(
-                {"error": "Параметры profile_id и file_base64 обязательны"},
+                {"error": 'Параметры profile_id и file_base64 обязательны'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -48,21 +48,29 @@ class FileUploadViewSet(viewsets.ModelViewSet):
             # Декодируем Base64
             file_data_decoded = base64.b64decode(file_base64)
             
+            # Определяем переданный пользователем формат
+            try:
+                file_mime_user = file_name.split('.')[1]
+            except IndexError:
+                return Response({'error': 'file_name должен быть в виде *название*.*формат*'},
+                status=status.HTTP_400_BAD_REQUEST)
+            
 
             # Определяем MIME-тип и расширение с помощью filetype
             kind = filetype.guess(file_data_decoded)
-            if not kind:
-                return Response(
-                    {"error": "Не удалось определить тип файла"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
 
-            file_mime = kind.mime
-            file_extension = kind.extension
+            # Если формат не удалось определить, то берем формат от пользователя
+            if not kind:
+                file_extension = file_mime_user
+            else:
+                file_mime = kind.mime
+                file_extension = kind.extension
+
 
             # Генерируем имя файла с расширением
-            file_name_with_extension = f"{file_name}.{file_extension}"
-            file_relative_path = os.path.join(f"files/{profile_id}", file_name_with_extension)
+            file_name_with_extension = f"{file_name.split('.')[0]}.{file_extension}"
+            file_relative_path = os.path.join(
+                f'files/{list(profile_id)[0]}/{list(profile_id)[1]}/{file_name_with_extension}')
 
 
             file_content = ContentFile(file_data_decoded, name=file_name_with_extension)
@@ -82,7 +90,7 @@ class FileUploadViewSet(viewsets.ModelViewSet):
             )
 
             # Сохраняем файл и путь к нему в модели
-            user_profile.file_field = f"files/{file_instance.file_id}/{file_name_with_extension}"
+            user_profile.file_field = file_relative_path
             user_profile.save()
 
             return Response({'status': 'File uploaded successfully'}, status=status.HTTP_200_OK)
