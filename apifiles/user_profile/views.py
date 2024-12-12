@@ -9,34 +9,68 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
 from .models import UserProfile, File, CustomStorage
-from .serializers import UserProfileSerializer, FileSerializer
+from .serializers import UserProfileSerializer, FileSerializer, CustomTokenObtainPairSerializer
 from rest_framework import viewsets
 from django.conf import settings
 import os
 from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .permissions import IsAuthenticatedForNonGet
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
+from .authentication import CustomJWTAuthentication
+
+
+header_params = [
+    openapi.Parameter('Project-ID', openapi.IN_HEADER, description="Project ID", type=openapi.TYPE_STRING),
+    openapi.Parameter('Account-ID', openapi.IN_HEADER, description="Account ID", type=openapi.TYPE_STRING),
+    openapi.Parameter('Authorization', openapi.IN_HEADER, description="Bearer token", type=openapi.TYPE_STRING),
+]
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
+
+    def post(self, request, *args, **kwargs):
+        # Используем сериализатор для валидации данных
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Получаем access токен
+        access_token = serializer.validated_data['access']
+
+        # Возвращаем его в заголовке
+        response = Response({"message": "Token issued successfully"})
+        response['Authorization'] = f"Bearer {access_token}"
+        return response
 
 class UserProfileViewSet(viewsets.ModelViewSet):
     queryset = UserProfile.objects.all()
     serializer_class = UserProfileSerializer
     http_method_names = ['get', 'post']
+    permission_classes = [IsAuthenticatedForNonGet]
 
 
 class FileUploadViewSet(viewsets.ModelViewSet):
-    #permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticatedForNonGet]
+    authentication_classes = [CustomJWTAuthentication]
     queryset = File.objects.all()
     serializer_class = FileSerializer
 
+    @swagger_auto_schema(manual_parameters=header_params)
     def create(self, request, *args, **kwargs):
-        profile_id = request.data.get('profile_id')
+        project_id = request.headers.get('Project-ID')
+        profile_id = request.headers.get('Account-ID')
+        #profile_id = request.data.get('profile_id')
         file_name = request.data.get('file_name', 'uploaded_file')
         file_base64 = request.data.get('file_base64')
         file_type = request.data.get('file_type', 'document')
-        project_id = request.data.get('project_id')
+        #project_id = request.data.get('project_id')
 
         # Проверка обязательных параметров
-        if not profile_id or not file_base64:
+        if not project_id or not profile_id or not file_base64:
             return Response(
-                {"error": 'Параметры profile_id и file_base64 обязательны'},
+                {"error": 'Заголовки Project-ID и Account-ID, а также параметр file_base64 обязательны'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
