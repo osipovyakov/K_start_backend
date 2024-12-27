@@ -14,27 +14,27 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class FileSerializer(serializers.ModelSerializer):
     class Meta:
         model = File
-        fields = ['file_id', 'file_name', 'file_type', 'file_base64']
+        fields = ['name', 'data']
 
 
 class CustomTokenObtainPairSerializer(serializers.Serializer):
-    profile_id = serializers.CharField()
+    user_id = serializers.CharField()
 
     def validate(self, attrs):
-        profile_id = attrs.get('profile_id')
+        user_id = attrs.get('user_id')
 
-        if not profile_id:
-            raise AuthenticationFailed('profile_id is required')
+        if not user_id:
+            raise AuthenticationFailed('user_id is required')
 
-        # Находим пользователя по profile_id
+        # Находим пользователя по user_id
         try:
-            user = UserProfile.objects.get(profile_id=profile_id)
+            user = UserProfile.objects.get(user_id=user_id)
         except UserProfile.DoesNotExist:
-            raise AuthenticationFailed('User with this profile_id does not exist')
+            raise AuthenticationFailed('User with this user_id does not exist')
 
         # Создаем токен для найденного пользователя
         refresh = RefreshToken.for_user(user)
-        refresh['profile_id'] = str(user.profile_id)
+        refresh['user_id'] = str(user.user_id)
         access_token = str(refresh.access_token)
 
         return {

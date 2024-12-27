@@ -137,8 +137,8 @@ REST_FRAMEWORK = {
     ],
 }
 SIMPLE_JWT = {
-    'USER_ID_FIELD': 'profile_id',
-    'USER_ID_CLAIM': 'profile_id',
+    'USER_ID_FIELD': 'user_id',
+    'USER_ID_CLAIM': 'user_id',
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
 }
 

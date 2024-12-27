@@ -5,10 +5,10 @@ from rest_framework.exceptions import AuthenticationFailed
 
 class CustomJWTAuthentication(JWTAuthentication):
     def get_user(self, validated_token):
-        profile_id = validated_token.get('profile_id')
-        if profile_id:
+        user_id = validated_token.get('user_id')
+        if user_id:
             try:
-                return UserProfile.objects.get(profile_id=profile_id)
+                return UserProfile.objects.get(user_id=user_id)
             except UserProfile.DoesNotExist:
                 raise AuthenticationFailed('User not found')
-        raise AuthenticationFailed('Invalid profile_id')
+        raise AuthenticationFailed('Invalid user_id')

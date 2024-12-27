@@ -2,6 +2,7 @@ import base64
 import filetype
 import magic
 from io import BytesIO
+from datetime import datetime
 from PIL import Image
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
@@ -23,7 +24,8 @@ from .authentication import CustomJWTAuthentication
 
 header_params = [
     openapi.Parameter('Project-ID', openapi.IN_HEADER, description="Project ID", type=openapi.TYPE_STRING),
-    openapi.Parameter('Account-ID', openapi.IN_HEADER, description="Account ID", type=openapi.TYPE_STRING),
+    openapi.Parameter('Account-ID', openapi.IN_HEADER, description="Account-ID", type=openapi.TYPE_STRING),
+    openapi.Parameter('User-ID', openapi.IN_HEADER, description="User ID", type=openapi.TYPE_STRING),
     openapi.Parameter('Authorization', openapi.IN_HEADER, description="Bearer token", type=openapi.TYPE_STRING),
 ]
 
@@ -60,27 +62,33 @@ class FileUploadViewSet(viewsets.ModelViewSet):
     @swagger_auto_schema(manual_parameters=header_params)
     def create(self, request, *args, **kwargs):
         project_id = request.headers.get('Project-ID')
-        profile_id = request.headers.get('Account-ID')
-        #profile_id = request.data.get('profile_id')
+        account_id = request.headers.get('Account-ID')
+        user_id = request.headers.get('User-ID')
         file_name = request.data.get('file_name', 'uploaded_file')
         file_base64 = request.data.get('file_base64')
         file_type = request.data.get('file_type', 'document')
-        #project_id = request.data.get('project_id')
 
         # Проверка обязательных параметров
-        if not project_id or not profile_id or not file_base64:
+        if not user_id or not file_base64:
             return Response(
-                {"error": 'Заголовки Project-ID и Account-ID, а также параметр file_base64 обязательны'},
+                {"error": 'Заголовок User-ID, а также параметр file_base64 обязательны'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
+        # Декодируем Base64
+        file_data_decoded = base64.b64decode(file_base64)
         
 
         try:
             # Получаем объект пользователя
-            user_profile = UserProfile.objects.get(profile_id=profile_id)
+            user_profile = UserProfile.objects.get(user_id=user_id)
 
-            # Декодируем Base64
-            file_data_decoded = base64.b64decode(file_base64)
+            if user_profile.contact_phone:
+                object_code = user_profile.contact_phone
+            elif user_profile.contact_email:
+                object_code = user_profile.contact_email
+            else:
+                object_code = ''
             
             # Определяем переданный пользователем формат
             try:
@@ -104,7 +112,7 @@ class FileUploadViewSet(viewsets.ModelViewSet):
             # Генерируем имя файла с расширением
             file_name_with_extension = f"{file_name.split('.')[0]}.{file_extension}"
             file_relative_path = os.path.join(
-                f'files/{list(profile_id)[0]}/{list(profile_id)[1]}/{file_name_with_extension}')
+                f'files/{list(user_id)[0]}/{list(user_id)[1]}/{file_name_with_extension}')
 
 
             file_content = ContentFile(file_data_decoded, name=file_name_with_extension)
@@ -115,12 +123,21 @@ class FileUploadViewSet(viewsets.ModelViewSet):
 
             # Создаем объект ContentFile для хранения файла
             file_instance = File.objects.create(
-                file_name=file_name,
-                file_type=file_type,
-                file_mime=file_mime,
-                file_base64=file_base64,
-                profile_id=profile_id,
+                created_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                modified_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                user_id=user_id,
+                account_id = account_id,
                 project_id=project_id,
+                object_type=file_type,
+                object_item = user_id,
+                object_code = object_code,
+                name = file_name,
+                meta = {"status": "active",
+                        "flags": 0,
+                        "internal_id": ""},
+                data = {'file_mime': file_mime,
+                        'file_data': file_base64}
+                
             )
 
             # Сохраняем файл и путь к нему в модели
