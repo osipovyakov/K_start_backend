@@ -28,8 +28,8 @@ class CustomStorage(FileSystemStorage):
 
 class UserProfile(models.Model):
     user_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, primary_key=True)
-    project_id = models.UUIDField(default=uuid.uuid4, editable=True, unique=False)
-    account_id = models.UUIDField(default=uuid.uuid4, editable = True, unique=False)
+    project_id = models.UUIDField(default=uuid.uuid4, editable=True, unique=False, blank=True)
+    account_id = models.UUIDField(default=uuid.uuid4, editable = True, unique=False, blank=True)
     profile_type = models.CharField(max_length=20, choices=[('anonymous', 'Anonymous'), ('person', 'Person')])
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
@@ -53,7 +53,7 @@ class File(models.Model):
     user_id = models.UUIDField(default=None, null=True)
     object_type = models.CharField(max_length=254, null=True)
     object_item = models.UUIDField(default=None, null=True) # = Profile_ID
-    object_code = models.CharField(max_length=254, null=True, unique=True) # = phone or email
+    object_code = models.CharField(max_length=254, null=True) # = phone or email
     name = models.CharField(max_length=254, null=False)
     meta = models.JSONField(default=meta_default_value)
     data = models.JSONField(default=data_default_value, null=True)

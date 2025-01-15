@@ -1,5 +1,5 @@
+import base64
 from rest_framework import serializers
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import authenticate
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -11,10 +11,52 @@ class UserProfileSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class FileSerializer(serializers.ModelSerializer):
+class FileSerializerPost(serializers.ModelSerializer):
+    file_name = serializers.CharField(write_only=True)
+    file_base64 = serializers.CharField(write_only=True)
+    file_type = serializers.CharField(write_only=True, default='document')
+
     class Meta:
         model = File
-        fields = ['name', 'data']
+        fields = ['file_name', 'file_base64', 'file_type']
+    
+    def validate(self, attrs):
+        # Проверяем наличие обязательных полей
+        if not attrs.get('file_name'):
+            raise serializers.ValidationError({'file_name': 'This field is required.'})
+        if not attrs.get('file_base64'):
+            raise serializers.ValidationError({'file_base64': 'This field is required.'})
+        if not attrs.get('file_type'):
+            raise serializers.ValidationError({'file_type': 'This field is required.'})
+
+        return attrs
+
+    def create(self, validated_data):
+        # Извлекаем значения из сериализованных данных
+        file_name = validated_data.pop('file_name')
+        file_base64 = validated_data.pop('file_base64')
+        file_type = validated_data.pop('file_type')
+
+        # Преобразуем Base64 данные
+        data = {
+            'file_name': file_name,
+            'file_base64': file_base64,
+            'file_type': file_type
+        }
+
+        # Создаем запись в базе данных
+        file_instance = File.objects.create(
+            **validated_data, 
+            data=data  # Сохраняем данные в поле 'data'
+        )
+
+        return file_instance
+
+
+class FileSerializerRead(serializers.ModelSerializer):
+    class Meta:
+        model = File
+        fields = '__all__'
 
 
 class CustomTokenObtainPairSerializer(serializers.Serializer):
